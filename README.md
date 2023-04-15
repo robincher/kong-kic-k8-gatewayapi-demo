@@ -15,13 +15,13 @@ gcloud container clusters create robincher-scratch-cluster --num-nodes=1 --machi
 
 # Initi Kubectl
 gcloud container clusters get-credentials robincher-scratch-cluster \
-    --region=asia-southeast1
+    --region=asia-southeast1 --project={{project-id}}
 ```
  
 ### Install Kong KIC
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/Kong/kubernetes-ingress-controller/v2.8.0/deploy/single/all-in-one-dbless.yaml
+kubectl apply -f https://raw.githubusercontent.com/Kong/kubernetes-ingress-controller/v2.9.2/deploy/single/all-in-one-dbless.yaml
 
 ```
 
@@ -30,7 +30,7 @@ kubectl apply -f https://raw.githubusercontent.com/Kong/kubernetes-ingress-contr
 Since the K8 Gateway API is still in tech preview and not available in kubernetes distribution by deafult, you need to install the Gateway API associated resources and admission controller [manually](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api).
 
 ```
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.5.1/experimental-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.6.2/experimental-install.yaml
 ```
 
 ### Update Feature Flag for Gateway API in Kong KIC
@@ -39,10 +39,11 @@ Next we need to restart Kong to recognize those Gateway Resources. Upon restarti
 
 ```
 # Restart KIC
-kubectl rollout restart -n NAMESPACE deployment DEPLOYMENT_NAME
+# kubectl rollout restart -n NAMESPACE deployment DEPLOYMENT_NAME
+kubectl rollout restart -n kong deployment/ingress-kong
 
 # Set Env Var to enable feature flag
-kubectl set env -n default deployment/ingress-kong CONTROLLER_FEATURE_GATES="GatewayAlpha=true" -c ingress-controller
+kubectl set env -n kong deployment/ingress-kong CONTROLLER_FEATURE_GATES="GatewayAlpha=true" -c ingress-controller
 ```
 
 ### GatewayClass and Gateway
@@ -64,22 +65,24 @@ kong   kong    203.0.113.42   True    4m46s
 
 ### Deploy Test Service and HTTPRoute
 
-Next we deploy sample echo service and a HTTPRoute
+Next we deploy sample echo and httpbin service and a HTTPRoute with traffic splitting
 
 ```
-# Deploy Sample Service
-kubectl apply -f 02_Deployment.yaml
+# Deploy Sample Services
+kubectl apply -f 02a_Deployment.yaml
+kubectl apply -f 02b_Deployment.yaml
 
 # Deploy HTTPROute
-kbuectl apply -f 03_HTTPRoute.yaml
+kubectl apply -f 03_HTTPRoute.yaml
 ```
 
 # Testing
 
 ```
-curl -i http://kong.example/echo --resolve kong.example:80:$PROXY_IP
 
-http $PROXY_IP/echo
+export PROXY_IP=$(kubectl get -o jsonpath="{.status.loadBalancer.ingress[0].ip}" service -n kong kong-proxy)
+
+http $PROXY_IP/echo Host:kong.example person:robin
 ```
 
 [kong-url]: https://konghq.com/

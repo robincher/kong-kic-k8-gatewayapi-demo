@@ -14,7 +14,16 @@ spec:
     - path:
         type: PathPrefix
         value: /echo
+      headers:
+      - name: person
+        value: robin
     backendRefs:
     - name: echo
       kind: Service
       port: 80
+      weight: 50
+    - name: httpbin
+      kind: Service
+      port: 80
+      weight: 50
+
